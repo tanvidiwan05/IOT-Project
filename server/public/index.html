@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="IoT Smart Medicine Reminder and Monitoring System with real-time alerts and caretaker notifications">
+  <title>MediRemind — Smart Medicine Reminder</title>
+  <link rel="stylesheet" href="/css/styles.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💊</text></svg>">
+</head>
+<body>
+
+  <!-- Toast Notification Container -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <!-- Medicine Alert Overlay -->
+  <div class="alert-overlay" id="alertOverlay">
+    <div class="alert-card">
+      <div class="alert-icon">💊</div>
+      <h2 class="alert-title">Take Your Medicine!</h2>
+      <p class="alert-message" id="alertMessage">It's time to take your medicine.</p>
+      <div class="alert-time" id="alertTime">--:--</div>
+      <div style="display:flex;gap:10px;justify-content:center">
+        <button class="btn btn-success" id="alertConfirmBtn" onclick="confirmMedicine()">✅ I've Taken It</button>
+        <button class="btn btn-secondary" onclick="dismissAlert()">Dismiss</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="app-container">
+    <!-- ═══ HEADER ═══ -->
+    <header class="app-header">
+      <div class="header-left">
+        <div class="header-logo">💊</div>
+        <div>
+          <h1 class="header-title">MediRemind</h1>
+          <p class="header-subtitle">Smart Medicine Monitoring System</p>
+        </div>
+      </div>
+      <div class="header-right">
+        <div class="live-clock" id="liveClock">--:--:--</div>
+        <div class="device-indicator">
+          <span class="device-dot" id="deviceDot"></span>
+          <span id="deviceLabel">ESP8266 Offline</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- ═══ NAVIGATION TABS ═══ -->
+    <nav class="nav-tabs" id="navTabs">
+      <button class="nav-tab active" data-tab="dashboard">
+        <span class="tab-icon">📊</span>
+        <span class="tab-text">Dashboard</span>
+      </button>
+      <button class="nav-tab" data-tab="schedules">
+        <span class="tab-icon">⏰</span>
+        <span class="tab-text">Schedules</span>
+      </button>
+      <button class="nav-tab" data-tab="caretakers">
+        <span class="tab-icon">👥</span>
+        <span class="tab-text">Caretakers</span>
+      </button>
+      <button class="nav-tab" data-tab="history">
+        <span class="tab-icon">📋</span>
+        <span class="tab-text">History</span>
+      </button>
+    </nav>
+
+    <!-- ═══ DASHBOARD TAB ═══ -->
+    <div class="tab-content active" id="tab-dashboard">
+      <!-- Stats Grid -->
+      <div class="stats-grid" id="statsGrid">
+        <div class="stat-card taken">
+          <div class="stat-icon">✅</div>
+          <div class="stat-value" id="statTaken">0</div>
+          <div class="stat-label">Taken Today</div>
+        </div>
+        <div class="stat-card pending">
+          <div class="stat-icon">⏳</div>
+          <div class="stat-value" id="statPending">0</div>
+          <div class="stat-label">Pending</div>
+        </div>
+        <div class="stat-card missed">
+          <div class="stat-icon">❌</div>
+          <div class="stat-value" id="statMissed">0</div>
+          <div class="stat-label">Missed</div>
+        </div>
+        <div class="stat-card escalated">
+          <div class="stat-icon">🚨</div>
+          <div class="stat-value" id="statEscalated">0</div>
+          <div class="stat-label">Escalated</div>
+        </div>
+        <div class="stat-card compliance">
+          <div class="stat-icon">📈</div>
+          <div class="stat-value" id="statCompliance">100%</div>
+          <div class="stat-label">30-Day Compliance</div>
+        </div>
+      </div>
+
+      <!-- Upcoming Reminders -->
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title"><span class="icon">🔔</span> Upcoming Reminders</h2>
+          <button class="btn btn-sm btn-secondary" onclick="loadDashboard()">↻ Refresh</button>
+        </div>
+        <div id="upcomingList">
+          <div class="empty-state">
+            <div class="icon">📭</div>
+            <h3>No Reminders</h3>
+            <p>Add medicine schedules to see upcoming reminders.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ SCHEDULES TAB ═══ -->
+    <div class="tab-content" id="tab-schedules">
+      <!-- Add Schedule Form -->
+      <div class="card mb-2">
+        <div class="card-header">
+          <h2 class="card-title"><span class="icon">➕</span> <span id="scheduleFormTitle">Add New Schedule</span></h2>
+        </div>
+        <form id="scheduleForm" onsubmit="handleScheduleSubmit(event)">
+          <input type="hidden" id="scheduleEditId" value="">
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label" for="medicineName">Medicine Name</label>
+              <input type="text" class="form-input" id="medicineName" placeholder="e.g. Paracetamol" maxlength="100">
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="scheduledTime">Time</label>
+              <input type="time" class="form-input" id="scheduledTime" required>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Days (leave empty for every day)</label>
+            <div class="days-selector" id="daysSelector">
+              <button type="button" class="day-chip" data-day="0">Sun</button>
+              <button type="button" class="day-chip" data-day="1">Mon</button>
+              <button type="button" class="day-chip" data-day="2">Tue</button>
+              <button type="button" class="day-chip" data-day="3">Wed</button>
+              <button type="button" class="day-chip" data-day="4">Thu</button>
+              <button type="button" class="day-chip" data-day="5">Fri</button>
+              <button type="button" class="day-chip" data-day="6">Sat</button>
+            </div>
+          </div>
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary" id="scheduleSubmitBtn">💊 Add Schedule</button>
+            <button type="button" class="btn btn-secondary hidden" id="scheduleCancelBtn" onclick="cancelScheduleEdit()">Cancel</button>
+          </div>
+        </form>
+      </div>
+
+      <!-- Schedule List -->
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title"><span class="icon">📋</span> All Schedules</h2>
+        </div>
+        <div id="scheduleList">
+          <div class="empty-state">
+            <div class="icon">⏰</div>
+            <h3>No Schedules</h3>
+            <p>Create your first medicine schedule above.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ CARETAKERS TAB ═══ -->
+    <div class="tab-content" id="tab-caretakers">
+      <!-- Add Caretaker Form -->
+      <div class="card mb-2">
+        <div class="card-header">
+          <h2 class="card-title"><span class="icon">👤</span> Add Caretaker</h2>
+        </div>
+        <form id="caretakerForm" onsubmit="handleCaretakerSubmit(event)">
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label" for="caretakerName">Name</label>
+              <input type="text" class="form-input" id="caretakerName" placeholder="e.g. Dr. Sharma" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="caretakerPhone">Phone Number</label>
+              <input type="tel" class="form-input" id="caretakerPhone" placeholder="e.g. +919876543210" required>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="caretakerRelation">Relationship (optional)</label>
+            <input type="text" class="form-input" id="caretakerRelation" placeholder="e.g. Son, Doctor, Nurse">
+          </div>
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary">👥 Add Caretaker</button>
+          </div>
+        </form>
+      </div>
+
+      <!-- Caretaker List -->
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title"><span class="icon">📱</span> Registered Caretakers</h2>
+        </div>
+        <div id="caretakerList">
+          <div class="empty-state">
+            <div class="icon">👥</div>
+            <h3>No Caretakers</h3>
+            <p>Add caretakers to receive SMS alerts for missed medicines.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ HISTORY TAB ═══ -->
+    <div class="tab-content" id="tab-history">
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title"><span class="icon">📋</span> Intake History</h2>
+          <div style="display:flex;gap:8px;align-items:center">
+            <input type="date" class="form-input" id="historyDate" style="width:auto;padding:8px 12px;font-size:0.8rem" onchange="loadLogs()">
+            <button class="btn btn-sm btn-secondary" onclick="clearDateFilter()">All</button>
+          </div>
+        </div>
+        <div id="logList">
+          <div class="empty-state">
+            <div class="icon">📋</div>
+            <h3>No History</h3>
+            <p>Medicine intake logs will appear here.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/js/app.js"></script>
+</body>
+</html>
